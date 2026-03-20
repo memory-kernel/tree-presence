@@ -1,0 +1,25 @@
+{
+  "name": "mk-agent",
+  "version": "0.1.0",
+  "description": "Memory Kernel agent — physical objects get verifiable digital identities on Celo via ERC-8004",
+  "type": "module",
+  "bin": {
+    "mk-agent": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "mk-agent": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "commander": "^12.1.0",
+    "dotenv": "^17.3.1",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,1 +1,11 @@
 .claude/
+node_modules/
+dist/
+.mk-agent/
+.mk-agent-*/
+.mk-demo-*/
+*.tsbuildinfo
+agent.json
+agent_log.json
+guardian_output.log
+.env

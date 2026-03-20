@@ -1,5 +1,10 @@
 {
   "enabledPlugins": {
     "ethskills@ethskills": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)"
+    ]
   }
 }
