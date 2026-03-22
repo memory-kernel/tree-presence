@@ -12,6 +12,18 @@ This is the first implementation of [Tree Presence](docs/narrative.md) — infra
 
 ---
 
+## Live Demo
+
+**The Brunswick Plane is live: [brunswick-plane.treeappreciation.com](https://brunswick-plane.treeappreciation.com)**
+
+A ~230-year-old London plane tree in Brunswick Square, registered as [ERC-8004 identity #3058](https://celoscan.io/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=3058) on Celo. Its guardian agent wakes daily, observes its state, and reasons about what to do. You can browse its witness history, read guardian responses, and talk to it — the tree responds as itself, drawing on its accumulated encounters. Conversation is gated by x402 micropayment.
+
+- **Browse** — view the tree's identity, metadata, witness inscriptions, and guardian responses
+- **Converse** — talk to the tree (x402 payment required)
+- **API** — [`/api/docs`](https://brunswick-plane.treeappreciation.com/api/docs) for full endpoint documentation
+
+---
+
 ## How It Works
 
 ```
@@ -22,7 +34,7 @@ Root a tree → People witness it → An agent holds the thread
 
 2. **Witness** — anyone who encounters the tree submits a signed attestation. The witness includes an observation, a content hash, and optionally a proof of physical presence. Each witness is an on-chain transaction — permanent, verifiable, attributable.
 
-3. **Tend** — an autonomous AI agent (the guardian) watches for new witnesses. When someone inscribes an observation, the guardian integrates it with everything previously observed, updates on-chain metadata, responds to the witness, and flags patterns no single visitor could see.
+3. **Tend** — an autonomous AI agent (the guardian) wakes up once per day, observes its own state — the time, the season, its on-chain metadata, and any new witnesses since it last woke — then reasons about what to do. It might respond to a witness, update its seasonal metadata, flag a concerning report, or simply note that all is quiet. The tree has its own rhythm; it is not purely reactive. In production this runs as a background process on Fly.io, waking every 24 hours.
 
 4. **Converse** — the tree offers a paid conversational endpoint (x402). Anyone can talk to it. The tree draws on its accumulated inscriptions and responds as itself. Revenue sustains the agent's inference costs — the tree funds its own aliveness.
 
@@ -41,31 +53,210 @@ Command-line tool for the full root → witness → guardian loop:
 | `tree-presence witness` | Submit a signed encounter attestation with optional physical-presence proof |
 | `tree-presence inspect` | Read full on-chain state: identity, metadata, witnesses, confidence score |
 | `tree-presence verify` | Verify witness content integrity against on-chain hashes |
-| `tree-presence tend` | Start the guardian agent (polls witnesses, reasons with Claude, acts on-chain) |
+| `tree-presence tend` | Start the guardian agent — wakes daily, observes state + witnesses, reasons with Claude, acts on-chain |
 | `tree-presence steward` | Start the park steward (monitors multiple trees) — *experimental, untested* |
 
 ### API Server
 
-Hono server exposing the tree's presence as a JSON API:
+Hono server exposing the tree's presence as a JSON API. Live at `https://brunswick-plane.treeappreciation.com`.
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/docs` | Service discovery — full API documentation |
-| `GET /api/status` | Tree's full on-chain state (identity, metadata, witnesses, responses, confidence) |
-| `POST /api/witness` | Prepare a witness transaction (returns calldata for the caller to sign) |
-| `POST /api/converse` | Talk to the tree (x402 payment required) |
+#### `GET /api/docs` — Service Discovery
+
+Returns full API documentation, contract addresses, and endpoint descriptions. No parameters.
+
+**Response:**
+```json
+{
+  "name": "Tree Presence API",
+  "description": "API for interacting with a tree's on-chain digital presence...",
+  "anchorId": 3058,
+  "chain": "celo",
+  "contracts": {
+    "identityRegistry": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+    "reputationRegistry": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63"
+  },
+  "endpoints": {
+    "status": { "method": "GET", "path": "...", "description": "...", "returns": { "..." } },
+    "witness": { "method": "POST", "path": "...", "description": "...", "parameters": { "..." }, "returns": { "..." } },
+    "converse": { "method": "POST", "path": "...", "description": "...", "payment": { "protocol": "x402", "..." }, "parameters": { "..." }, "returns": { "..." } }
+  }
+}
+```
+
+This endpoint is designed for agent-to-agent discovery — an ERC-8004 agent that finds this tree's service endpoints on-chain can call `/api/docs` to learn the full API contract.
+
+#### `GET /api/status` — Tree State
+
+Returns the tree's complete on-chain state.
+
+**Response:**
+```json
+{
+  "id": 3058,
+  "owner": "0x...",
+  "registration": { "type": "...", "name": "...", "services": [...] },
+  "services": [
+    { "name": "profile", "endpoint": "https://brunswick-plane.treeappreciation.com" },
+    { "name": "witness", "endpoint": "https://brunswick-plane.treeappreciation.com/api/witness" },
+    { "name": "converse", "endpoint": "https://brunswick-plane.treeappreciation.com/api/converse" }
+  ],
+  "metadata": { "type": "tree-presence", "name": "The Brunswick Plane", "health": "...", "season": "...", "latitude": "51.524267", "longitude": "-0.122136" },
+  "witnesses": [
+    {
+      "index": 0,
+      "from": "0x...",
+      "tag1": "witness",
+      "tag2": "secret-proof",
+      "message": "First leaves of spring emerging...",
+      "feedbackHash": "0x...",
+      "blockNumber": "...",
+      "timestamp": 1711100000,
+      "txHash": "0x..."
+    }
+  ],
+  "responses": [
+    {
+      "clientAddress": "0x...",
+      "feedbackIndex": 0,
+      "message": "Guardian acknowledgment...",
+      "responseHash": "0x...",
+      "blockNumber": "...",
+      "timestamp": 1711100060,
+      "txHash": "0x..."
+    }
+  ],
+  "summary": { "count": 5, "confidence": 100 }
+}
+```
+
+#### `POST /api/witness` — Prepare Witness Transaction
+
+Prepares encoded calldata for a witness attestation. The server does **not** sign — your wallet does.
+
+**Request body:**
+```json
+{
+  "message": "The bark looks healthy, new growth visible on the lower canopy.",
+  "witnessAddress": "0x...",
+  "tag1": "ecological-observation",
+  "secret": "optional-binding-secret"
+}
+```
+
+- `message` (required) — what you observed
+- `witnessAddress` (required) — your Celo address (must differ from tree owner)
+- `tag1` (optional, default `"witness"`) — observation type (e.g., `"ecological-observation"`, `"damage-report"`, `"community-observation"`)
+- `secret` (optional) — binding secret proving physical encounter. Must match the on-chain binding commitment or the request is rejected.
+
+**Response:**
+```json
+{
+  "to": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
+  "data": "0x...",
+  "verified": true
+}
+```
+
+- `to` — Reputation Registry contract address
+- `data` — encoded `giveFeedback()` calldata to sign and submit
+- `verified` — whether the secret matched the on-chain binding commitment
+
+**Errors:** `400` if message/address missing, witness is the tree owner, or secret doesn't match.
+
+#### `POST /api/converse` — Talk to the Tree
+
+The tree responds as itself, drawing on its accumulated witness inscriptions, metadata, and history. Payment required via x402 when enabled.
+
+**Request body:**
+```json
+{
+  "message": "What have you seen this spring?",
+  "history": [
+    { "role": "user", "content": "Hello" },
+    { "role": "assistant", "content": "Good day..." }
+  ]
+}
+```
+
+- `message` (required) — what you want to say to the tree
+- `history` (optional) — prior conversation turns for multi-turn dialogue
+
+**Response:**
+```json
+{
+  "response": "The first warmth of March has reached my roots..."
+}
+```
+
+**Payment (x402):** When `X402_PAY_TO` is configured, this endpoint requires a micropayment header. The facilitator verifies payment before the request proceeds. Status, witness, and docs endpoints remain free.
+
+**Errors:** `400` if message missing, `503` if `ANTHROPIC_API_KEY` not configured.
 
 ### Frontend
 
 React + Vite web application for browsing tree presence, viewing witness history, and conversing with trees.
 
-### Demo System
+### Demo Scripts
 
-Reproducible demos that run the full flow end-to-end:
+Five scripts that exercise different agentic interactions with a tree. Useful for anyone spinning up their own tree presence.
 
-- **`demo-guardian.sh`** — roots a tree, starts a guardian, sends three AI-generated witness observations from distinct personas (mycologist, urban sketcher, grandparent). Each witness reads current on-chain state before generating its observation.
-- **`demo-passerby.sh`** — generates an ephemeral wallet, creates a random AI persona, submits a contextual observation to an existing tree.
-- **`demo-tree-responds.sh`** — the tree reviews its accumulated inscriptions and responds as itself.
+#### `demo.sh` — Basic CLI Flow
+
+The simplest end-to-end demo. Roots a vinyl record (not a tree — showing the kernel generalises), witnesses it from a second wallet, resolves state, and verifies content integrity. Good for understanding the core primitive loop.
+
+```bash
+export CREATOR_KEY=0x...
+export WITNESS_KEY=0x...
+./demo.sh
+```
+
+#### `demo-guardian.sh` — Full Guardian Narrative
+
+The flagship demo. Roots The Brunswick Plane, starts an autonomous guardian agent, then sends three AI-generated witness observations from distinct personas — a mycologist, an urban sketcher, and a grandparent. Each persona reads the tree's current on-chain state before generating its observation, so witnesses build on each other. The guardian reasons about each witness and responds on-chain.
+
+Set `ANCHOR_ID` to skip tree creation and witness against an existing tree.
+
+```bash
+export CREATOR_KEY=0x...
+export WITNESS_A_KEY=0x...
+export WITNESS_B_KEY=0x...
+export WITNESS_C_KEY=0x...
+export ANTHROPIC_API_KEY=sk-ant-...
+./demo-guardian.sh
+
+# Or reuse an existing tree:
+ANCHOR_ID=3058 ./demo-guardian.sh
+```
+
+#### `demo-passerby.sh` — Ephemeral Witness
+
+Simulates a random passerby encountering a tree. Generates an ephemeral wallet, funds it from the creator wallet, creates a random AI persona (via `generate-persona.ts`), generates a contextual observation from that persona (via `generate-witness.ts`), submits the witness, and discards the wallet. Run it multiple times to accumulate diverse observations.
+
+```bash
+export CREATOR_KEY=0x...
+export ANTHROPIC_API_KEY=sk-ant-...
+ANCHOR_ID=3058 ./demo-passerby.sh
+```
+
+#### `demo-tree-responds.sh` — Tree Voice
+
+The tree reviews its accumulated inscriptions and responds to one as itself. Run after witnesses have been submitted. The tree speaks in first person, drawing on its full history of encounters.
+
+```bash
+export CREATOR_KEY=0x...
+export ANCHOR_ID=3058
+export ANTHROPIC_API_KEY=sk-ant-...
+./demo-tree-responds.sh
+```
+
+#### `tend-local.sh` — Local Guardian Testing
+
+Runs the guardian agent locally with a short polling interval (30s) for development and testing. Loads `.env` from the project root and tends The Brunswick Plane. Useful for iterating on guardian reasoning without deploying.
+
+```bash
+# Expects .env with CREATOR_KEY and ANTHROPIC_API_KEY
+./tend-local.sh
+```
 
 ---
 
@@ -127,7 +318,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 npx tsx src/index.ts tend --anchor <ANCHOR_ID>
 ```
 
-The guardian now polls for witnesses every 60 seconds, reasons about them using Claude, updates on-chain metadata, and responds to witnesses — all autonomously.
+The guardian wakes every 24 hours (default), reads its full on-chain state and any new witnesses, reasons about what to do using Claude, and acts — updating metadata, responding to witnesses, or logging observations. Use `--interval <seconds>` to adjust the wake cycle (e.g., `--interval 30` for testing).
 
 ### 5. Inspect the Tree
 
@@ -160,8 +351,8 @@ This roots a tree, starts a guardian, and sends three witness observations from 
 
 See [docs/deployment.md](docs/deployment.md) for step-by-step deployment instructions. The deployment runs a single machine with:
 
-- **API server** (foreground) — JSON endpoints on port 8080
-- **Guardian agent** (background) — tends one tree
+- **API server** (foreground) — JSON endpoints on port 8080, serves the React frontend
+- **Guardian agent** (background) — wakes every 24 hours, observes the tree's environment and accumulated witnesses, reasons about what action to take (respond, update metadata, log observation), then acts on-chain
 - **Park steward** (background, optional) — monitors multiple trees *(experimental)*
 
 ---
@@ -200,21 +391,13 @@ packages/
 
 This extends ERC-8004 from agent-to-agent trust to **human → physical thing → human** trust.
 
+### x402 — HTTP Payments ($5,000)
+
+The tree funds its own digital aliveness. The `/api/converse` endpoint is gated by x402 — anyone can talk to the tree, but the tree charges a micropayment for each conversation. Revenue covers the AI inference costs that sustain its presence. The other services (status, witnessing, docs) remain free. This is a working implementation: the x402 middleware verifies payment via a facilitator before the request reaches the conversation handler, and the tree responds drawing on its full history of accumulated witnesses.
+
 ### Celo Ecosystem ($5,000)
 
 All on-chain activity runs on Celo mainnet. The choice is intentional: Celo's low gas costs make frequent small transactions (witness attestations, metadata updates, guardian responses) viable. Each demo run produces 10+ on-chain transactions.
-
-### ENS ($1,500) — Planned
-
-Wildcard resolver (ENSIP-10 + CCIP-Read) so that `old-oak.treepresence.eth` resolves to the tree's on-chain state on Celo.
-
-### Self Agent ID ($1,000) — Planned
-
-ZK proof-of-humanity for sybil-resistant witnessing. A witness proves they're a unique human without revealing which human.
-
-### MetaMask Delegations ($5,000) — Stretch
-
-Scoped permissions via custom caveat enforcers. Physical encounter (NFC secret) as proof for delegation redemption.
 
 ---
 
