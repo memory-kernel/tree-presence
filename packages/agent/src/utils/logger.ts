@@ -34,7 +34,7 @@ export function writeAgentManifest(data: {
   agentId: number;
 }): void {
   const manifest = {
-    name: 'memory-kernel-agent',
+    name: 'tree-presence-agent',
     version: '0.1.0',
     description:
       'Agent that manages physical-object identities on Celo via ERC-8004. ' +

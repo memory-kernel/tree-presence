@@ -1,19 +1,19 @@
 import { Command } from 'commander';
 import { hexToString } from 'viem';
-import { MemoryKernelAgent } from '../agent.js';
+import { TreePresenceAgent } from '../agent.js';
 import { getMetadata, getOwner, getTokenURI } from '../erc8004/identity.js';
 import { getWitnessEvents, getSummary } from '../erc8004/reputation.js';
 import { decodeDataUri } from '../utils/ipfs.js';
 import { appendLog, txUrl } from '../utils/logger.js';
 
-export function registerResolveCommand(program: Command): void {
+export function registerInspectCommand(program: Command): void {
   program
-    .command('resolve')
-    .description('Read anchor state — identity, metadata, and accumulated witnesses')
+    .command('inspect')
+    .description('Inspect a tree — read its identity, metadata, and accumulated witnesses')
     .requiredOption('--anchor <id>', 'Anchor ID (ERC-8004 agentId)')
     .option('--json', 'Output as JSON')
     .action(async (opts) => {
-      const agent = new MemoryKernelAgent();
+      const agent = new TreePresenceAgent();
       // Only need public client for reads
       try {
         agent.load();

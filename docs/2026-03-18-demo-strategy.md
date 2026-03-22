@@ -1,13 +1,13 @@
 # Demo Strategy — Tree Guardian Agent
 
 **Date:** 2026-03-18
-**Status:** Guardian agent implemented, not yet tested on-chain
+**Status:** Guardian agent implemented and tested on-chain. Demo scripts working.
 
 ---
 
 ## What's Built
 
-The `mk-agent serve` command is implemented in `packages/agent/`. It starts an autonomous guardian loop for any anchored subject:
+The `tp-agent tend` command is implemented in `packages/agent/`. It starts an autonomous guardian loop for any anchored subject:
 
 - **Polling**: Watches for `NewFeedback` events on the anchor every 10s
 - **Reasoning**: Sends full context (all witnesses, metadata, summary) to Claude via tool_use
@@ -35,9 +35,9 @@ Modified: `erc8004/abis.ts` (appendResponse ABI), `erc8004/reputation.ts` (appen
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-export MK_PRIVATE_KEY=0x...
-mk-agent serve --anchor <id>
-mk-agent serve --anchor <id> --model claude-haiku-4-5-20251001  # cheaper model
+export TP_PRIVATE_KEY=0x...
+tp-agent tend --anchor <id>
+tp-agent tend --anchor <id> --model claude-haiku-4-5-20251001  # cheaper model
 ```
 
 ---
@@ -50,12 +50,12 @@ A tree anchored at a geographic location. People encounter it and leave witness 
 
 1. **Anchor the tree**
    ```bash
-   mk-agent anchor --type tree --name "Old Oak" --secret "park-bench-left"
+   tp-agent root --type tree --name "Old Oak" --secret "park-bench-left"
    ```
 
 2. **Start the guardian**
    ```bash
-   mk-agent serve --anchor <id>
+   tp-agent tend --anchor <id>
    ```
 
 3. **Three encounters from different wallets:**
@@ -76,7 +76,7 @@ A tree anchored at a geographic location. People encounter it and leave witness 
 
 5. **Resolve shows the accumulated state:**
    ```bash
-   mk-agent resolve --anchor <id>
+   tp-agent inspect --anchor <id>
    ```
    Metadata, all witnesses, all guardian responses, confidence score.
 
@@ -100,7 +100,7 @@ The tree's ERC-8004 identity should advertise discoverable services:
     { "name": "guardian", "endpoint": "erc8004:42:reputation:response" },
     { "name": "seasonal-report", "endpoint": "erc8004:42:metadata:season" },
     { "name": "health-status", "endpoint": "erc8004:42:metadata:health" },
-    { "name": "ENS", "endpoint": "old-oak.memorykernel.eth" }
+    { "name": "ENS", "endpoint": "old-oak.treepresence.eth" }
   ]
 }
 ```
@@ -109,13 +109,13 @@ This is what makes it an **agent** in the ERC-8004 sense — discoverable, inter
 
 ### Priority 3: ENS Wildcard Resolver (medium)
 
-`old-oak.memorykernel.eth` resolving to the tree's metadata via ENSIP-10 + CCIP-Read from Celo. Even a stub contract on Sepolia that maps subnames → agentIds. Hits the $1,500 ENS bounty.
+`old-oak.treepresence.eth` resolving to the tree's metadata via ENSIP-10 + CCIP-Read from Celo. Even a stub contract on Sepolia that maps subnames → agentIds. Hits the $1,500 ENS bounty.
 
 ### Priority 4: Park Steward Agent — Agent-to-Agent (medium)
 
 **This is the key hackathon differentiator.**
 
-A second agent (e.g., `mk-agent serve-steward --park <id>`) that:
+A second agent (e.g., `tp-agent steward --park <id>`) that:
 - Has its own ERC-8004 identity on Celo
 - Monitors multiple tree anchors in a park
 - Queries each tree's health metadata periodically

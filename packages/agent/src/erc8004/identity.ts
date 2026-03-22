@@ -85,7 +85,9 @@ export async function setMetadata(
     args: [agentId, key, value],
     account: walletClient.account,
   });
-  return walletClient.writeContract(request);
+  const txHash = await walletClient.writeContract(request);
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  return txHash;
 }
 
 /**
@@ -151,7 +153,9 @@ export async function updateAgentURI(
     args: [agentId, newURI],
     account: walletClient.account,
   });
-  return walletClient.writeContract(request);
+  const txHash = await walletClient.writeContract(request);
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  return txHash;
 }
 
 /**
@@ -161,29 +165,48 @@ export function buildRegistrationJson(params: {
   name: string;
   description: string;
   type?: string;
+  imageURI?: string;
+  latitude?: string;
+  longitude?: string;
   services?: ServiceEntry[];
 }): string {
-  return JSON.stringify({
+  const json: Record<string, unknown> = {
     type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
     name: params.name,
     description: params.description,
     services: params.services ?? [],
     active: true,
-  });
+  };
+  if (params.imageURI) json.imageURI = params.imageURI;
+  if (params.latitude && params.longitude) {
+    json.location = { latitude: params.latitude, longitude: params.longitude };
+  }
+  return JSON.stringify(json);
 }
 
 /**
  * Build the default services array for an anchor.
+ *
+ * @param agentId — on-chain identity token ID
+ * @param profileUrl — canonical human-readable page (e.g., https://treeappreciation.com/tree/brunswick-plane)
+ * @param presenceUrl — base URL for presence API (e.g., https://presence.treeappreciation.com)
  */
-export function buildServices(agentId: bigint, serviceUrl?: string): ServiceEntry[] {
-  const services: ServiceEntry[] = [
-    { name: 'guardian', endpoint: 'erc8004:celo:reputation:response' },
-    { name: 'health-status', endpoint: 'erc8004:celo:metadata:health' },
-    { name: 'seasonal-report', endpoint: 'erc8004:celo:metadata:season' },
-  ];
-  if (serviceUrl) {
-    const base = serviceUrl.replace(/\/$/, '');
-    services.push({ name: 'web', endpoint: `${base}/tree/${agentId}` });
+export function buildServices(
+  agentId: bigint,
+  profileUrl?: string,
+  presenceUrl?: string,
+): ServiceEntry[] {
+  const services: ServiceEntry[] = [];
+  if (profileUrl) {
+    services.push({ name: 'profile', endpoint: profileUrl });
+  }
+  if (presenceUrl) {
+    const base = `${presenceUrl.replace(/\/$/, '')}/tree/${agentId}`;
+    services.push(
+      { name: 'witness', endpoint: `${base}/witness` },
+      { name: 'converse', endpoint: `${base}/converse` },
+      { name: 'health', endpoint: `${base}/health` },
+    );
   }
   return services;
 }

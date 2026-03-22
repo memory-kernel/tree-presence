@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { keccak256, stringToHex } from 'viem';
-import { MemoryKernelAgent } from '../agent.js';
+import { TreePresenceAgent } from '../agent.js';
 import { getMetadata, getOwner } from '../erc8004/identity.js';
 import { giveFeedback } from '../erc8004/reputation.js';
 import { createDataUri } from '../utils/ipfs.js';
@@ -16,7 +16,7 @@ export function registerWitnessCommand(program: Command): void {
     .option('--tag <tag>', 'Witness type tag (default: witness)', 'witness')
     .option('--method <method>', 'Binding method (default: secret-proof)', 'secret-proof')
     .action(async (opts) => {
-      const agent = new MemoryKernelAgent();
+      const agent = new TreePresenceAgent();
       agent.load({ requireSigner: true });
 
       const anchorId = BigInt(opts.anchor);

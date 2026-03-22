@@ -1,9 +1,9 @@
 .claude/
 node_modules/
 dist/
-.mk-agent/
-.mk-agent-*/
-.mk-demo-*/
+.tp-agent/
+.tp-agent-*/
+.tp-demo-*/
 *.tsbuildinfo
 agent.json
 agent_log.json

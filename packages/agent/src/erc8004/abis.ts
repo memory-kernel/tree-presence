@@ -261,6 +261,7 @@ export const reputationRegistryAbi = [
       { indexed: true, internalType: 'uint256', name: 'agentId', type: 'uint256' },
       { indexed: true, internalType: 'address', name: 'clientAddress', type: 'address' },
       { indexed: false, internalType: 'uint64', name: 'feedbackIndex', type: 'uint64' },
+      { indexed: true, internalType: 'address', name: 'respondentAddress', type: 'address' },
       { indexed: false, internalType: 'string', name: 'responseURI', type: 'string' },
       { indexed: false, internalType: 'bytes32', name: 'responseHash', type: 'bytes32' },
     ],

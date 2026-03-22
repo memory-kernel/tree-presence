@@ -100,20 +100,29 @@ export async function getWitnessEvents(
     toBlock: 'latest',
   });
 
-  return logs.map((log) => ({
-    agentId: log.args.agentId!,
-    clientAddress: log.args.clientAddress!,
-    feedbackIndex: Number(log.args.feedbackIndex!),
-    value: log.args.value!,
-    valueDecimals: Number(log.args.valueDecimals!),
-    tag1: log.args.tag1!,
-    tag2: log.args.tag2!,
-    endpoint: log.args.endpoint!,
-    feedbackURI: log.args.feedbackURI!,
-    feedbackHash: log.args.feedbackHash!,
-    blockNumber: log.blockNumber,
-    txHash: log.transactionHash!,
-  }));
+  // The feedbackIndex emitted in NewFeedback events may be a global sequential
+  // index across all clients, but appendResponse expects a per-client index.
+  // Compute per-client indices by counting feedbacks per client in event order.
+  const perClientCounters = new Map<string, number>();
+  return logs.map((log) => {
+    const client = log.args.clientAddress!.toLowerCase();
+    const perClientIndex = perClientCounters.get(client) ?? 0;
+    perClientCounters.set(client, perClientIndex + 1);
+    return {
+      agentId: log.args.agentId!,
+      clientAddress: log.args.clientAddress!,
+      feedbackIndex: perClientIndex,
+      value: log.args.value!,
+      valueDecimals: Number(log.args.valueDecimals!),
+      tag1: log.args.tag1!,
+      tag2: log.args.tag2!,
+      endpoint: log.args.endpoint!,
+      feedbackURI: log.args.feedbackURI!,
+      feedbackHash: log.args.feedbackHash!,
+      blockNumber: log.blockNumber,
+      txHash: log.transactionHash!,
+    };
+  });
 }
 
 /**
@@ -189,5 +198,7 @@ export async function appendResponse(
     ],
     account: walletClient.account,
   });
-  return walletClient.writeContract(request);
+  const txHash = await walletClient.writeContract(request);
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  return txHash;
 }

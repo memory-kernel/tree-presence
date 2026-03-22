@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { keccak256, stringToHex } from 'viem';
-import { MemoryKernelAgent } from '../agent.js';
+import { TreePresenceAgent } from '../agent.js';
 import {
   registerIdentity,
   buildRegistrationJson,
@@ -11,22 +11,34 @@ import {
 import { createDataUri } from '../utils/ipfs.js';
 import { appendLog, txUrl } from '../utils/logger.js';
 
-export function registerAnchorCommand(program: Command): void {
+export function registerRootCommand(program: Command): void {
   program
-    .command('anchor')
-    .description('Create an anchor — bind a physical object to an on-chain identity')
-    .requiredOption('--type <type>', 'Object type (e.g., vinyl-record, book, tree)')
+    .command('root')
+    .description('Root a tree — register it as an on-chain identity with ERC-8004')
+    .requiredOption('--type <type>', 'Presence type (e.g., tree-presence, vinyl-record, book)')
     .requiredOption('--name <name>', 'Human-readable name')
     .option('--secret <secret>', 'Binding secret (NFC secret, passphrase, etc.)')
     .option('--description <desc>', 'Description of the physical object')
-    .option('--service-url <url>', 'Base URL for web service (e.g., https://treeappreciation.com)')
+    .option('--image-uri <uri>', 'Image URI (IPFS, HTTP, or data URI)')
+    .option('--latitude <lat>', 'Latitude of the physical subject')
+    .option('--longitude <lng>', 'Longitude of the physical subject')
+    .option('--profile-url <url>', 'Canonical human-readable page URL')
+    .option('--presence-url <url>', 'Base URL for presence API (e.g., https://presence.example.com)')
     .action(async (opts) => {
-      const agent = new MemoryKernelAgent();
+      const agent = new TreePresenceAgent();
       agent.load({ requireSigner: true });
 
-      if (!agent.hasOnChainIdentity()) {
-        console.error('Agent not registered on-chain. Run "mk-agent init" first.');
-        process.exit(1);
+      // Check if an anchor with this name already exists locally
+      const existing = Object.entries(agent.state!.anchors).find(
+        ([, a]) => a.name === opts.name,
+      );
+      if (existing) {
+        const [id, anchor] = existing;
+        console.log(`Anchor already exists for "${opts.name}".`);
+        console.log(`  Anchor ID: ${id}`);
+        console.log(`  Type:      ${anchor.type}`);
+        console.log(`  Tx:        ${txUrl(anchor.txHash)}`);
+        return;
       }
 
       // Build initial registration JSON (no services yet — agentId unknown)
@@ -36,6 +48,9 @@ export function registerAnchorCommand(program: Command): void {
         name: opts.name,
         description,
         type: opts.type,
+        imageURI: opts.imageUri,
+        latitude: opts.latitude,
+        longitude: opts.longitude,
       });
       const agentURI = createDataUri(registrationJson);
 
@@ -53,6 +68,26 @@ export function registerAnchorCommand(program: Command): void {
         },
       ];
 
+      // Add image URI
+      if (opts.imageUri) {
+        metadata.push({
+          metadataKey: 'imageURI',
+          metadataValue: encodeStringMetadata(opts.imageUri),
+        });
+      }
+
+      // Add location
+      if (opts.latitude && opts.longitude) {
+        metadata.push({
+          metadataKey: 'latitude',
+          metadataValue: encodeStringMetadata(opts.latitude),
+        });
+        metadata.push({
+          metadataKey: 'longitude',
+          metadataValue: encodeStringMetadata(opts.longitude),
+        });
+      }
+
       // Add binding commitment if secret provided
       if (opts.secret) {
         const commitment = keccak256(stringToHex(opts.secret));
@@ -66,7 +101,7 @@ export function registerAnchorCommand(program: Command): void {
         });
       }
 
-      console.log(`Creating anchor for "${opts.name}" (${opts.type})...`);
+      console.log(`Rooting "${opts.name}" (${opts.type})...`);
       if (opts.secret) {
         console.log(`  Binding commitment: keccak256("${opts.secret}")`);
       }
@@ -82,11 +117,14 @@ export function registerAnchorCommand(program: Command): void {
       console.log(`  Registration TX: ${txUrl(txHash)}`);
 
       // TX 2: Update URI with services now that we have agentId
-      const services = buildServices(agentId, opts.serviceUrl);
+      const services = buildServices(agentId, opts.profileUrl, opts.presenceUrl);
       const updatedJson = buildRegistrationJson({
         name: opts.name,
         description,
         type: opts.type,
+        imageURI: opts.imageUri,
+        latitude: opts.latitude,
+        longitude: opts.longitude,
         services,
       });
       const updatedURI = createDataUri(updatedJson);
@@ -123,7 +161,7 @@ export function registerAnchorCommand(program: Command): void {
         },
       });
 
-      console.log('\nAnchor created!');
+      console.log('\nTree rooted!');
       console.log(`  Anchor ID: ${agentId}`);
       console.log(`  Type:      ${opts.type}`);
       console.log(`  Name:      ${opts.name}`);

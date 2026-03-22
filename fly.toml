@@ -1,4 +1,4 @@
-app = "memory-kernel"
+app = "tree-presence"
 primary_region = "iad"
 
 [build]
@@ -16,7 +16,7 @@ primary_region = "iad"
   min_machines_running = 1
 
 [mounts]
-  source = "mk_data"
+  source = "tp_data"
   destination = "/app/data"
 
 [[vm]]

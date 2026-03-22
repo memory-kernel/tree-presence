@@ -2,7 +2,9 @@ import {
   createPublicClient,
   http,
   hexToString,
-  decodeEventLog,
+  encodeFunctionData,
+  keccak256,
+  stringToHex,
   type PublicClient,
   type Chain,
   type Transport,
@@ -91,6 +93,7 @@ const responseAppendedEvent = {
     { indexed: true, name: 'agentId', type: 'uint256' },
     { indexed: true, name: 'clientAddress', type: 'address' },
     { indexed: false, name: 'feedbackIndex', type: 'uint64' },
+    { indexed: true, name: 'respondentAddress', type: 'address' },
     { indexed: false, name: 'responseURI', type: 'string' },
     { indexed: false, name: 'responseHash', type: 'bytes32' },
   ],
@@ -123,6 +126,7 @@ export interface WitnessData {
   message: string;
   feedbackHash: string;
   blockNumber: bigint;
+  timestamp: number;
   txHash: string;
 }
 
@@ -132,6 +136,7 @@ export interface ResponseData {
   message: string;
   responseHash: string;
   blockNumber: bigint;
+  timestamp: number;
   txHash: string;
 }
 
@@ -143,8 +148,9 @@ function decodeDataUri(uri: string): string | null {
 
 const METADATA_KEYS = [
   'type', 'name', 'status', 'health', 'season', 'last_observation',
-  'framework', 'creator', 'bindingStrategy',
+  'framework', 'creator', 'bindingStrategy', 'bindingCommitment',
   'overall_health', 'active_concerns', 'tree_count', 'last_patrol',
+  'imageURI', 'latitude', 'longitude',
 ];
 
 export async function fetchAnchor(anchorId: number): Promise<AnchorData> {
@@ -214,6 +220,30 @@ export async function fetchAnchor(anchorId: number): Promise<AnchorData> {
     toBlock: 'latest',
   });
 
+  // Fetch response events in parallel with witness parsing
+  const responseLogs = await publicClient.getLogs({
+    address: REPUTATION_REGISTRY,
+    event: responseAppendedEvent,
+    args: { agentId: id },
+    fromBlock: startBlock,
+    toBlock: 'latest',
+  });
+
+  // Collect unique block numbers for timestamp resolution
+  const allLogs = [...witnessLogs, ...responseLogs];
+  const uniqueBlocks = [...new Set(allLogs.map((l) => l.blockNumber))];
+  const blockTimestamps = new Map<bigint, number>();
+  await Promise.all(
+    uniqueBlocks.map(async (bn) => {
+      try {
+        const block = await publicClient.getBlock({ blockNumber: bn });
+        blockTimestamps.set(bn, Number(block.timestamp));
+      } catch {
+        blockTimestamps.set(bn, 0);
+      }
+    }),
+  );
+
   const witnesses: WitnessData[] = witnessLogs.map((log) => {
     const args = log.args as Record<string, unknown>;
     let message = '';
@@ -236,17 +266,9 @@ export async function fetchAnchor(anchorId: number): Promise<AnchorData> {
       message,
       feedbackHash: args.feedbackHash as string,
       blockNumber: log.blockNumber,
+      timestamp: blockTimestamps.get(log.blockNumber) || 0,
       txHash: log.transactionHash!,
     };
-  });
-
-  // Fetch response events
-  const responseLogs = await publicClient.getLogs({
-    address: REPUTATION_REGISTRY,
-    event: responseAppendedEvent,
-    args: { agentId: id },
-    fromBlock: startBlock,
-    toBlock: 'latest',
   });
 
   const responses: ResponseData[] = responseLogs.map((log) => {
@@ -269,6 +291,7 @@ export async function fetchAnchor(anchorId: number): Promise<AnchorData> {
       message,
       responseHash: args.responseHash as string,
       blockNumber: log.blockNumber,
+      timestamp: blockTimestamps.get(log.blockNumber) || 0,
       txHash: log.transactionHash!,
     };
   });
@@ -306,4 +329,90 @@ export async function fetchAnchor(anchorId: number): Promise<AnchorData> {
     responses,
     summary: { count, confidence: Math.min(100, count * 20) },
   };
+}
+
+// --- Witness transaction preparation ---
+
+const giveFeedbackAbi = [
+  {
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'value', type: 'int128' },
+      { name: 'valueDecimals', type: 'uint8' },
+      { name: 'tag1', type: 'string' },
+      { name: 'tag2', type: 'string' },
+      { name: 'endpoint', type: 'string' },
+      { name: 'feedbackURI', type: 'string' },
+      { name: 'feedbackHash', type: 'bytes32' },
+    ],
+    name: 'giveFeedback',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+] as const;
+
+export async function prepareWitnessTx(
+  anchorId: number,
+  params: {
+    message: string;
+    witnessAddress: string;
+    tag1: string;
+    secret?: string;
+  },
+): Promise<{ to: string; data: string; verified: boolean }> {
+  const id = BigInt(anchorId);
+
+  // Check witness is not the owner
+  const owner = await publicClient.readContract({
+    address: IDENTITY_REGISTRY,
+    abi: identityAbi,
+    functionName: 'ownerOf',
+    args: [id],
+  }) as string;
+
+  if (owner.toLowerCase() === params.witnessAddress.toLowerCase()) {
+    throw new Error('You own this anchor. Witnesses must come from a different address.');
+  }
+
+  // Verify secret if provided
+  let verified = false;
+  let tag2 = 'unverified';
+  if (params.secret) {
+    const raw = (await publicClient.readContract({
+      address: IDENTITY_REGISTRY,
+      abi: identityAbi,
+      functionName: 'getMetadata',
+      args: [id, 'bindingCommitment'],
+    })) as `0x${string}`;
+
+    const onChain = raw && raw !== '0x' ? raw : '';
+    const computed = keccak256(stringToHex(params.secret));
+
+    if (onChain === computed) {
+      verified = true;
+      tag2 = 'secret-proof';
+    } else {
+      throw new Error('Secret does not match on-chain binding commitment');
+    }
+  }
+
+  // Build inscription
+  const inscription = {
+    anchorId,
+    message: params.message,
+    witnessAddress: params.witnessAddress,
+    timestamp: new Date().toISOString(),
+    secretVerified: verified,
+  };
+  const feedbackURI = `data:application/json;base64,${Buffer.from(JSON.stringify(inscription)).toString('base64')}`;
+  const feedbackHash = keccak256(stringToHex(params.message));
+
+  const data = encodeFunctionData({
+    abi: giveFeedbackAbi,
+    functionName: 'giveFeedback',
+    args: [id, 100n, 2, params.tag1, tag2, '', feedbackURI, feedbackHash],
+  });
+
+  return { to: REPUTATION_REGISTRY, data, verified };
 }

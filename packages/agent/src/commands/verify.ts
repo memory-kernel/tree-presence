@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { keccak256, stringToHex } from 'viem';
-import { MemoryKernelAgent } from '../agent.js';
+import { TreePresenceAgent } from '../agent.js';
 import { getWitnessEvents } from '../erc8004/reputation.js';
 import { decodeDataUri } from '../utils/ipfs.js';
 import { appendLog, txUrl } from '../utils/logger.js';
@@ -13,7 +13,7 @@ export function registerVerifyCommand(program: Command): void {
     .requiredOption('--witness <index>', 'Witness index (0-based across all witnesses)')
     .option('--content <content>', 'Content to verify against on-chain hash')
     .action(async (opts) => {
-      const agent = new MemoryKernelAgent();
+      const agent = new TreePresenceAgent();
       // Only need public client
       try {
         agent.load();

@@ -3,28 +3,28 @@
 import 'dotenv/config';
 import { Command } from 'commander';
 import { registerInitCommand } from './commands/init.js';
-import { registerAnchorCommand } from './commands/anchor.js';
+import { registerRootCommand } from './commands/root.js';
 import { registerWitnessCommand } from './commands/witness.js';
-import { registerResolveCommand } from './commands/resolve.js';
+import { registerInspectCommand } from './commands/inspect.js';
 import { registerVerifyCommand } from './commands/verify.js';
-import { registerServeCommand } from './commands/serve.js';
-import { registerServeStewardCommand } from './commands/serve-steward.js';
+import { registerTendCommand } from './commands/tend.js';
+import { registerStewardCommand } from './commands/steward.js';
 
 const program = new Command();
 
 program
-  .name('mk-agent')
+  .name('tree-presence')
   .description(
-    'Memory Kernel Agent — physical objects get verifiable digital identities on Celo',
+    'Tree Presence — physical trees get verifiable digital presence on Celo',
   )
   .version('0.1.0');
 
 registerInitCommand(program);
-registerAnchorCommand(program);
+registerRootCommand(program);
 registerWitnessCommand(program);
-registerResolveCommand(program);
+registerInspectCommand(program);
 registerVerifyCommand(program);
-registerServeCommand(program);
-registerServeStewardCommand(program);
+registerTendCommand(program);
+registerStewardCommand(program);
 
 program.parse();

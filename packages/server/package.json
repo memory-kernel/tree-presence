@@ -1,7 +1,7 @@
 {
-  "name": "mk-web",
+  "name": "tp-server",
   "version": "0.1.0",
-  "description": "Memory Kernel web status page — live tree and park state from Celo",
+  "description": "Tree Presence API server — tree presence endpoints on Celo via ERC-8004",
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -9,9 +9,15 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@coinbase/x402": "^2.1.0",
     "@hono/node-server": "^1.19.11",
+    "@x402/core": "^2.7.0",
+    "@x402/evm": "^2.7.0",
+    "@x402/hono": "^2.7.0",
+    "dotenv": "^17.3.1",
     "hono": "^4.7.0",
-    "viem": "^2.21.0"
+    "viem": "^2.47.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

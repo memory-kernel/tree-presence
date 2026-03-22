@@ -7,9 +7,16 @@ export interface AnchorContext {
     type: string;
     metadata: Record<string, string>;
   };
-  newWitness: WitnessEvent;
-  allWitnesses: WitnessEvent[];
+  time: {
+    iso: string;
+    localTime: string;
+    dayOfWeek: string;
+    season: string;
+  };
+  witnesses: WitnessEvent[];
+  unacknowledged: WitnessEvent[];
   summary: { count: number; confidence: number };
+  lastWakeUp: string | null;
 }
 
 export type AgentAction =

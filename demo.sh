@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Memory Kernel Demo — Full CLI flow
+# Tree Presence Demo — Full CLI flow
 #
 # Prerequisites:
 #   1. cd packages/agent && npm install
@@ -14,29 +14,29 @@
 set -euo pipefail
 
 AGENT_CMD="npx tsx src/index.ts"
-CREATOR_DIR=".mk-agent-creator"
-WITNESS_DIR=".mk-agent-witness"
+CREATOR_DIR=".tp-agent-creator"
+WITNESS_DIR=".tp-agent-witness"
 
 cd "$(dirname "$0")/packages/agent"
 
 echo "============================================"
-echo "  Memory Kernel Agent — Demo"
-echo "  Physical objects → verifiable digital identities"
+echo "  Tree Presence — Demo"
+echo "  Physical things → verifiable digital presence"
 echo "============================================"
 echo ""
 
 # --- Step 1: Initialize creator agent ---
 echo ">>> Step 1: Initialize creator agent (manages physical objects)"
 echo ""
-MK_PRIVATE_KEY="${CREATOR_KEY:?Set CREATOR_KEY to a funded Celo wallet private key}" \
-  MK_DATA_DIR="$CREATOR_DIR" $AGENT_CMD init
+TP_PRIVATE_KEY="${CREATOR_KEY:?Set CREATOR_KEY to a funded Celo wallet private key}" \
+  TP_DATA_DIR="$CREATOR_DIR" $AGENT_CMD init
 echo ""
 
 # --- Step 2: Create an anchor for a vinyl record ---
 echo ">>> Step 2: Create anchor for 'Kind of Blue' vinyl record"
 echo "    This mints an ERC-8004 identity NFT with a binding commitment."
 echo ""
-MK_DATA_DIR="$CREATOR_DIR" $AGENT_CMD anchor \
+TP_DATA_DIR="$CREATOR_DIR" $AGENT_CMD root \
   --type vinyl-record \
   --name "Kind of Blue" \
   --secret "miles-davis-1959" \
@@ -54,15 +54,15 @@ echo ""
 # --- Step 3: Initialize witness agent (simulating a different person) ---
 echo ">>> Step 3: Initialize witness agent (simulating a person encountering the record)"
 echo ""
-MK_PRIVATE_KEY="${WITNESS_KEY:?Set WITNESS_KEY to a funded Celo wallet private key}" \
-  MK_DATA_DIR="$WITNESS_DIR" $AGENT_CMD init
+TP_PRIVATE_KEY="${WITNESS_KEY:?Set WITNESS_KEY to a funded Celo wallet private key}" \
+  TP_DATA_DIR="$WITNESS_DIR" $AGENT_CMD init
 echo ""
 
 # --- Step 4: Witness the encounter ---
 echo ">>> Step 4: Record witness — the person proves they encountered the record"
 echo "    The secret is verified against the on-chain binding commitment."
 echo ""
-MK_DATA_DIR="$WITNESS_DIR" $AGENT_CMD witness \
+TP_DATA_DIR="$WITNESS_DIR" $AGENT_CMD witness \
   --anchor "$ANCHOR_ID" \
   --secret "miles-davis-1959" \
   --message "Miles Davis changed my life"
@@ -71,7 +71,7 @@ echo ""
 # --- Step 5: Resolve the anchor ---
 echo ">>> Step 5: Resolve anchor — read full state with accumulated witnesses"
 echo ""
-$AGENT_CMD resolve --anchor "$ANCHOR_ID"
+$AGENT_CMD inspect --anchor "$ANCHOR_ID"
 echo ""
 
 # --- Step 6: Verify witness integrity ---

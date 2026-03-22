@@ -25,13 +25,13 @@ export interface AnchorRecord {
 export interface AgentState {
   address: string;
   agentId?: number;
-  registrationTxHash?: string;
   createdAt: string;
   anchors: Record<string, AnchorRecord>;
+  lastWakeUp?: string;
   lastProcessedBlock?: number;
 }
 
-export class MemoryKernelAgent {
+export class TreePresenceAgent {
   public state: AgentState | null = null;
   public account: Account | null = null;
   public publicClient: PublicClient<Transport, Chain>;
@@ -52,19 +52,15 @@ export class MemoryKernelAgent {
     return existsSync(this.statePath);
   }
 
-  hasOnChainIdentity(): boolean {
-    return this.state?.agentId !== undefined;
-  }
-
   /**
    * Load agent state from disk. If the command needs to sign transactions,
-   * pass requireSigner: true — this reads MK_PRIVATE_KEY from the environment.
+   * pass requireSigner: true — this reads TP_PRIVATE_KEY from the environment.
    * Read-only commands can call load() without a signer.
    */
   load(opts?: { requireSigner?: boolean }): void {
     if (!this.isInitialized()) {
       throw new Error(
-        'Agent not initialized. Run "mk-agent init" first.',
+        'Agent not initialized. Run "tp-agent init" first.',
       );
     }
     this.state = JSON.parse(readFileSync(this.statePath, 'utf-8'));
@@ -75,15 +71,15 @@ export class MemoryKernelAgent {
   }
 
   /**
-   * Read the private key from MK_PRIVATE_KEY env var and set up the wallet client.
+   * Read the private key from TP_PRIVATE_KEY env var and set up the wallet client.
    * The key is held only in memory, never written to disk.
    */
   loadSigner(): void {
-    const privateKey = process.env.MK_PRIVATE_KEY;
+    const privateKey = process.env.TP_PRIVATE_KEY;
     if (!privateKey) {
       throw new Error(
-        'MK_PRIVATE_KEY environment variable is required for signing transactions.\n' +
-        'Export it before running this command: export MK_PRIVATE_KEY=0x...',
+        'TP_PRIVATE_KEY environment variable is required for signing transactions.\n' +
+        'Export it before running this command: export TP_PRIVATE_KEY=0x...',
       );
     }
 
@@ -97,9 +93,9 @@ export class MemoryKernelAgent {
     // Verify the key matches the stored address (if we have state)
     if (this.state && this.state.address !== this.account.address) {
       throw new Error(
-        `MK_PRIVATE_KEY address (${this.account.address}) does not match ` +
+        `TP_PRIVATE_KEY address (${this.account.address}) does not match ` +
         `stored agent address (${this.state.address}).\n` +
-        'Use the same key that was used during "mk-agent init".',
+        'Use the same key that was used during "tp-agent init".',
       );
     }
   }

@@ -1,17 +1,17 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { ReasoningProvider, AnchorContext, AgentAction } from './provider.js';
-import { buildSystemPrompt, buildContextMessage } from './prompts.js';
+import { buildSystemPrompt, buildWakeUpMessage } from './prompts.js';
 
 const TOOLS: Anthropic.Tool[] = [
   {
     name: 'update_metadata',
-    description: 'Update the on-chain metadata for this anchor. Use for status, health, season, last_observation, or any key you deem appropriate.',
+    description: 'Update your on-chain metadata. Use for status, health, season, last_observation, or any key you deem appropriate.',
     input_schema: {
       type: 'object' as const,
       properties: {
         key: { type: 'string', description: 'Metadata field name (e.g., "status", "health", "season", "last_observation")' },
         value: { type: 'string', description: 'New value for the field' },
-        reasoning: { type: 'string', description: 'Why this update is warranted based on witness evidence' },
+        reasoning: { type: 'string', description: 'Why this update is warranted' },
       },
       required: ['key', 'value', 'reasoning'],
     },
@@ -32,11 +32,11 @@ const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'log_observation',
-    description: 'Record an observation or reasoning note without taking on-chain action. Use for internal notes, pattern tracking, or when no on-chain action is warranted.',
+    description: 'Record an observation or note. Use when you notice something but no on-chain action is needed.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        note: { type: 'string', description: 'The observation or reasoning to log' },
+        note: { type: 'string', description: 'The observation to log' },
       },
       required: ['note'],
     },
@@ -47,14 +47,14 @@ export class ClaudeReasoningProvider implements ReasoningProvider {
   private client: Anthropic;
   private model: string;
 
-  constructor(model = 'claude-sonnet-4-20250514') {
+  constructor(model = 'claude-haiku-4-5-20251001') {
     this.client = new Anthropic();
     this.model = model;
   }
 
   async reason(context: AnchorContext): Promise<AgentAction[]> {
     const systemPrompt = buildSystemPrompt(context.anchor.name, context.anchor.type);
-    const userMessage = buildContextMessage(context);
+    const userMessage = buildWakeUpMessage(context);
 
     const response = await this.client.messages.create({
       model: this.model,

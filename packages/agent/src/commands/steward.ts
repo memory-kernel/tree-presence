@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import { hexToString, keccak256, stringToHex } from 'viem';
-import { MemoryKernelAgent } from '../agent.js';
+import { TreePresenceAgent } from '../agent.js';
 import { getWitnessEvents, getSummary, giveFeedback } from '../erc8004/reputation.js';
 import { getMetadata, setMetadata, encodeStringMetadata } from '../erc8004/identity.js';
 import { appendLog, txUrl } from '../utils/logger.js';
@@ -12,7 +12,7 @@ const POLL_INTERVAL_MS = 30_000;
 const METADATA_KEYS = ['type', 'name', 'status', 'health', 'season', 'last_observation', 'overall_health', 'active_concerns', 'tree_count', 'last_patrol', 'framework'];
 
 async function fetchMetadata(
-  agent: MemoryKernelAgent,
+  agent: TreePresenceAgent,
   anchorId: bigint,
 ): Promise<Record<string, string>> {
   const metadata: Record<string, string> = {};
@@ -30,7 +30,7 @@ async function fetchMetadata(
 }
 
 async function executeStewardAction(
-  agent: MemoryKernelAgent,
+  agent: TreePresenceAgent,
   parkId: bigint,
   action: StewardAction,
 ): Promise<void> {
@@ -108,10 +108,10 @@ async function executeStewardAction(
   }
 }
 
-export function registerServeStewardCommand(program: Command): void {
+export function registerStewardCommand(program: Command): void {
   program
-    .command('serve-steward')
-    .description('Start autonomous park steward agent — monitors multiple trees and reasons about park-wide patterns')
+    .command('steward')
+    .description('Start the park steward — monitors multiple trees and reasons about park-wide patterns')
     .requiredOption('--park <id>', 'Park anchor ID (owned by this wallet)')
     .requiredOption('--trees <ids>', 'Comma-separated tree anchor IDs to monitor')
     .option('--model <model>', 'Claude model to use', 'claude-sonnet-4-20250514')
@@ -119,11 +119,11 @@ export function registerServeStewardCommand(program: Command): void {
       const parkId = BigInt(opts.park);
       const treeIds = opts.trees.split(',').map((id) => BigInt(id.trim()));
 
-      const agent = new MemoryKernelAgent();
+      const agent = new TreePresenceAgent();
       agent.load({ requireSigner: true });
 
       if (!agent.state?.agentId) {
-        console.error('Agent not initialized on-chain. Run "mk-agent init" first.');
+        console.error('Agent not initialized. Run "tree-presence init" first.');
         process.exit(1);
       }
 
